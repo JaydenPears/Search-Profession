@@ -4,17 +4,29 @@ import json
 import sqlite3
 
 
+def open_json(filename):
+    with open(filename, 'r', encoding='UTF-8') as file:
+        f = file.read()
+        data = json.loads(f)
+    return data
+
+
+TRANSLATE = {'crisisAnalytics': 'Кризисная аналитика', 'registration': 'Бухгалтерский учёт',
+             'state': 'Государственный менеджмент', 'entrepreneurial': 'Государственный менеджмент'}
+DISTRICTS = open_json('districts.json')
+
+
 class Database:
     def __init__(self, filename):
         self.filename_database = filename
         self.connect = sqlite3.connect(self.filename_database, check_same_thread=False)
         self.cursor = self.connect.cursor()
 
-    def read(self, tableName):
+    def read(self, chat_id, tableName):
         try:
             db = sqlite3.connect(self.filename_database)
             cursor = db.cursor()
-            query = f"""SELECT place,salary,link FROM {tableName};"""
+            query = f"""SELECT place,salary,link FROM {tableName} WHERE chat_id={chat_id};"""
             cursor.execute(query)
             data = cursor.fetchall()
             cursor.close()
@@ -27,13 +39,13 @@ class Database:
             return data
 
     def rewrite_database(self, params, table_name):
-        self.cursor.execute(f"""INSERT INTO {table_name}(specialization, place, salary, link)
+        self.cursor.execute(f"""INSERT INTO {table_name}(chat_id, specialization, place, salary, link)
                                 VALUES ('{params[0]}', '{params[1]}',
-                                '{params[2]}', '{params[3]}');""")
+                                '{params[2]}', '{params[3]}', '{params[4]}');""")
         self.connect.commit()
 
-    def clear_database(self, table_name):
-        self.cursor.execute(f'DELETE FROM {table_name};')
+    def clear_database(self, chat_id, table_name):
+        self.cursor.execute(f'DELETE FROM {table_name} WHERE chat_id={chat_id};')
         self.connect.commit()
 
 
@@ -50,12 +62,16 @@ def get_page(text, page=0):
     return data
 
 
-def search_profession(database, table_name, profession, specialization, remote_work=False):
+def search_profession(chat_id, database, table_name, profession, specialization, district):
     max_pages = 1000
-    database.clear_database(table_name)
+    database.clear_database(chat_id, table_name)
+    if profession == 'it':
+        specialization = f'Разработчик {specialization}'
+    else:
+        specialization = TRANSLATE[specialization]
     try:
         for index_page in range(max_pages):
-            page = get_page(profession, index_page)
+            page = get_page(specialization, index_page)
             json_object = json.loads(page)
             for vacancy in json_object['items']:
                 salary = vacancy['salary']
@@ -65,24 +81,16 @@ def search_profession(database, table_name, profession, specialization, remote_w
                     continue
                 if salary['from'] is None or salary['to'] is None:
                     continue
-                if remote_work:
-                    if vacancy['address'] is not None:
-                        continue
-                    params = [specialization, 'Удалённая работа',
-                              str(vacancy['salary']['from']) + ' - ' + str(vacancy['salary']['to']),
-                              vacancy['alternate_url']]
-                else:
-                    if vacancy['address'] is None:
-                        continue
-                    if vacancy['address']['metro'] is None:
-                        continue
-                    params = [specialization, vacancy['address']['metro']['station_name'],
-                              str(vacancy['salary']['from']) + ' - ' + str(vacancy['salary']['to']),
-                              vacancy['alternate_url']]
+                if vacancy['address'] is None:
+                    continue
+                if vacancy['address']['metro'] is None:
+                    continue
+                place = vacancy['address']['metro']['station_name']
+                if place not in DISTRICTS[district]:
+                    continue
+                params = [chat_id, specialization, place,
+                          str(vacancy['salary']['from']) + ' - ' + str(vacancy['salary']['to']),
+                          vacancy['alternate_url']]
                 database.rewrite_database(params, table_name)
     except:
         pass
-
-
-database_filename = 'vacancies.db'
-db = Database(database_filename)
