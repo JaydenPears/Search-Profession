@@ -1,185 +1,206 @@
 # -*- coding: utf-8 -*-
 # import modules:
-from api import search_profession, db
+from api import Database, search_profession
 
 # import libraries:
 import telebot
 from telebot import types
-# ВОВА, ВЕРНИ СНИКЕРС!!!! ОН ХОЧЕТ ОСТАТЬСЯ ДЕВСТВЕННИКОМ!!!!
-#
-#
-# P.S. ШУЧУ) 
-#P.S.S ИЛИ НЕТ >:(
 
-LANGUAGES = ['Python', 'Rust', 'C++', 'C#', 'JS', 'SQL', 'Swift', 'Kotlin', 'Java', 'Assembler']
-TRANSLATE = {'developer': 'разработчик', 'gamedesigner': 'геймдзиайнер'}
-bot = telebot.TeleBot("5367028014:AAEKarGWXV5Zu0ybZsRkxGui00ILp6S388Y")
-massButtonChat = {}
-massButtonKeyboardG = []
-massButtonKeyboardD = []
-save = 0
-path = []
+bot = telebot.TeleBot("5333022128:AAEBsg_DAb20lLYh5oA0SdrfGiQO-D8h8Bk")
+db = Database('vacancies.db')
+
+listButtonChat = {}
+listPathForChat = {'finance': ['accounting', 'management', "Выберите сферу финансов:", 0],
+                   'it': ['gamedesigners', 'developers', "Выберите профессию:", 0],
+                   'gamedesigners': ['Languages', 1],
+                   'developers': ['Languages', 1],
+                   'accounting': ['crisisAnalytics', 'registration', "Выберите сферу:", 1],
+                   'management': ['state', 'entrepreneurial', "Выберите сферу:", 1],
+                   'crisisAnalytics': ['profession', 2],
+                   'registration': ['profession', 2],
+                   'state': ['profession', 2],
+                   'entrepreneurial': ['profession', 2],
+                   'languages': ['profession', 2],
+                   'district': [3],
+                   'Next_vac:': ['Next_vac']
+                   }
+languages = {'Python': ['G', 'D'], 'C++': ['G', 'D'], 'C#': ['G', 'D'], 'Swift': ['G', 'D'],
+             'Java': ['G', 'D'],
+             'Assembler': ['G'], 'Rust': ['D'], 'JavaScript': ['D'], 'SQL': ['D'], 'Kotlin': ['D']}
+listKeyboardLanguages = {'G': [], 'D': []}
+massKeyboardDistrict = []
+nameDistricts = ['СЗАО', 'САО', 'СВАО', 'ЗАО', 'ЦАО', 'ВАО', 'ЮЗАО', 'ЮАО', 'ЮВАО']
+
+new_call = 'Next_vac:'
+temp_keyboard = types.InlineKeyboardMarkup(row_width=1).add(
+    types.InlineKeyboardButton(text='Показать следующие вакансии', callback_data=new_call))
+
+checkStatus = {}
+
+vacancies = {}
 
 
 @bot.message_handler(commands=["start"])
 def start(message):
-    text_hello = 'Доброго времени суток! Я бот для поиска работы, созданный специально для помощи в этом молодым ' \
+    text_hello = 'Доброго времени суток! Я бот для поиска работы, ' \
+                 'созданный специально для помощи в этом молодым ' \
                  'специалистам в городе Москва.'
     bot.send_message(message.chat.id, text_hello)
 
     markup_inline = types.InlineKeyboardMarkup()
-    markup_inline.add(massButtonChat['work'], massButtonChat['sideJob'])
-    bot.send_message(message.chat.id, "Напиши команду /help для того, чтобы получить " \
-                                      "инструкцию по использованию моих функций. ", reply_markup=markup_inline)
+    markup_inline.add(listButtonChat['finance'], listButtonChat['it'])
+    checkStatus[message.chat.id] = [None] * 4
+    bot.send_message(message.chat.id,
+                     "Напишите команду /feedback для того, чтобы сообщить нам о проблемах " \
+                     "и доработках",
+                     reply_markup=markup_inline)
 
 
-@bot.message_handler(commands=["help"])
-def help(message):
-    text_hello = 'Ваши вопросы и пожелания просьба направлять на нашу почту: tgbotsearchforjob@gmail.com.'
+@bot.message_handler(commands=["feedback"])
+def feedback(message):
+    text_hello = 'Ваши вопросы и пожелания просьба направлять на нашу почту: ' \
+                 'tgbotsearchforjob@gmail.com.'
     bot.send_message(message.chat.id, text_hello)
-
-
-@bot.message_handler(content_types=["text"])
-def text_handler(message):
-    global path
-    search_profession(db, path[2] + 's', f'{message.text} {TRANSLATE[path[2]]}', message.text, path[3])
-    vacancies = db.read(path[2] + 's')  # Список, как список data в примере красивой печати
-    for vacancy in vacancies:
-        salary = vacancy[1].split()
-        if vacancy[0] == 'Удалённая работа':
-            place = 'Работа в удалённой форме.'
-        else:
-            place = f'Ближайшая станция метро: {vacancy[0]}'
-        message = f'Заработная ставка от {salary[0]} и до {salary[1]} рублей.\n'
-        message += f'{place}\n'
-        message += f'Ссылка на вакансию: {vacancy[2]}.\n'
-        message += f'-------------'
-    path = []
-		bot.send_message(call.message.chat.id,text=message)
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def answer(call):
-    global save, path
+    if call.data in list(languages.keys()):
+        value = listPathForChat['languages']
+    elif call.data in nameDistricts:
+        value = listPathForChat['district']
+    else:
+        value = listPathForChat[call.data]
 
-    if call.data == "work":
-        markup_inline_work = types.InlineKeyboardMarkup()
-        markup_inline_work.add(massButtonChat['finance'], massButtonChat['it'])
-        bot.send_message(call.message.chat.id, "Выберите сферу работы:", reply_markup=markup_inline_work)
-        path.append(call.data)
-    elif call.data == "sideJob":
-        pass
-    elif call.data == "finance":
-        markup_inline_finance = types.InlineKeyboardMarkup()
-        markup_inline_finance.add(massButtonChat['accounting'], massButtonChat['management'])
-        bot.send_message(call.message.chat.id, "Выберите сферу финансов:", reply_markup=markup_inline_finance)
-        path.append(call.data)
-    elif call.data == "it":
-        markup_inline_it = types.InlineKeyboardMarkup()
-        markup_inline_it.add(massButtonChat['gameDesign'], massButtonChat['developer'])
-        bot.send_message(call.message.chat.id, "Выбери профессию:", reply_markup=markup_inline_it)
-        path.append(call.data)
-    elif call.data == "gameDesign":
-        save = 'G'
-        markup_inline_it_next = types.InlineKeyboardMarkup()
-        markup_inline_it_next.add(massButtonChat['distantWork'], massButtonChat['spaceWork'])
-        bot.send_message(call.message.chat.id, "Режим работы:", reply_markup=markup_inline_it_next)
-        path.append(call.data)
-    elif call.data == "developer":
-        save = 'D'
-        markup_inline_it_next = types.InlineKeyboardMarkup()
-        markup_inline_it_next.add(massButtonChat['distantWork'], massButtonChat['spaceWork'])
-        bot.send_message(call.message.chat.id, "Режим работы:", reply_markup=markup_inline_it_next)
-        path.append(call.data)
-    elif call.data == "distantWork":
-        markup_inline_it_next_workD = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        if save == 'D':
-            main_mass = massButtonKeyboardD
+    if value[0] == 'Next_vac':
+        page = vacancies[call.message.chat.id][1]
+        array = vacancies[call.message.chat.id][0]
+
+        len_of_array = len(array)
+        len_for_vacancies = 0
+        need_keyboard = False
+
+        if len_of_array - (page * 5) > 5:
+            need_keyboard = True
+            len_for_vacancies = (page * 5) + 5
         else:
-            main_mass = massButtonKeyboardG
+            len_for_vacancies = len_of_array
 
-        for i in range(0, len(main_mass), 3):
-            markup_inline_it_next_workD.add(main_mass[i], main_mass[i + 1], main_mass[i + 2])
+        print_vacancy(call.message.chat.id, (page * 5), len_for_vacancies)
 
-        bot.send_message(call.message.chat.id, 'Выбери язык:', reply_markup=markup_inline_it_next_workD)
-        path.append(call.data)
-    elif call.data == "spaceWork":
-        markup_inline_it_next_workS = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        if save == 'D':
-            main_mass = massButtonKeyboardD
+        if need_keyboard:
+            array = vacancies[call.message.chat.id][0]
+            page = vacancies[call.message.chat.id][1] + 1
+            vacancies[call.message.chat.id] = [array, page]
+
+            bot.send_message(call.message.chat.id, 'Вы желаете просмотреть ещё вакансии?',
+                             reply_markup=temp_keyboard)
         else:
-            main_mass = massButtonKeyboardG
+            bot.send_message(call.message.chat.id, 'На данный момент это все вакансии.')
+    elif type(value[0]) == int:
+        index = value[0]
+        checkStatus[call.message.chat.id][index] = call.data
 
-        for i in range(0, len(main_mass), 3):
-            markup_inline_it_next_workS.add(main_mass[i], main_mass[i + 1], main_mass[i + 2])
+        profession = checkStatus[call.message.chat.id][0]
+        table = checkStatus[call.message.chat.id][1]
+        specialization = checkStatus[call.message.chat.id][2]
+        district = checkStatus[call.message.chat.id][3]
 
-        bot.send_message(call.message.chat.id, "Выбери язык:", reply_markup=markup_inline_it_next_workS)
-        path.append(call.data)
-    elif call.data == "accounting":
-        path.append(call.data)
-        path.append(False)
-        search_profession(db, path[2], f'Бухгалтерский учёт', 'Accounting')
-        vacancies = db.read(path[2])  # Список, как список data в примере красивой печати
-        path = []
-			for vacancy in vacancies:
-        salary = vacancy[1].split()
-        if vacancy[0] == 'Удалённая работа':
-            place = 'Работа в удалённой форме.'
+        search_profession(call.message.chat.id, db, table, profession, specialization, district)
+        vacancies[call.message.chat.id] = [db.read(call.message.chat.id, table).copy(), 0]
+
+        len_of_array = len(vacancies[call.message.chat.id][0])
+        len_for_vacancies = 0
+        need_keyboard = False
+
+        if len_of_array > 5:
+            len_for_vacancies = 5
+            need_keyboard = True
         else:
-            place = f'Ближайшая станция метро: {vacancy[0]}'
+            len_for_vacancies = len_of_array
+
+        print_vacancy(call.message.chat.id, 0, len_for_vacancies)
+
+        if need_keyboard:
+            array = vacancies[call.message.chat.id][0]
+            page = vacancies[call.message.chat.id][1] + 1
+            vacancies[call.message.chat.id] = [array, page]
+
+            bot.send_message(call.message.chat.id, 'Вы желаете просмотреть ещё вакансии?',
+                             reply_markup=temp_keyboard)
+        else:
+            if len_for_vacancies == 0:
+                bot.send_message(call.message.chat.id, 'По заданным критериям вакансии отсутствуют.')
+            else:
+                bot.send_message(call.message.chat.id, 'На данный момент это все вакансии.')
+    elif value[0] == 'profession':
+        index = value[1]
+        checkStatus[call.message.chat.id][index] = call.data
+        markup_inline_district = types.InlineKeyboardMarkup()
+        for i in range(0, len(massKeyboardDistrict), 3):
+            try:
+                markup_inline_district.add(massKeyboardDistrict[i], massKeyboardDistrict[i + 1],
+                                           massKeyboardDistrict[i + 2])
+            except Exception as err:
+                pass
+        bot.send_message(call.message.chat.id, "Выберите округ:",
+                         reply_markup=markup_inline_district)
+    elif value[0] == 'Languages':
+        markup_inline_languages = types.InlineKeyboardMarkup()
+        buttons = listKeyboardLanguages['G' if call.data == 'gameDesign' else 'D']
+        for i in range(0, len(buttons), 3):
+            try:
+                markup_inline_languages.add(buttons[i], buttons[i + 1], buttons[i + 2])
+            except Exception as err:
+                pass
+        bot.send_message(call.message.chat.id, "Выберите язык:",
+                         reply_markup=markup_inline_languages)
+        index = value[1]
+        checkStatus[call.message.chat.id][index] = call.data
+    else:
+        markup_inline = types.InlineKeyboardMarkup()
+        firstButton, secondButton, txt, index = value
+        markup_inline.add(listButtonChat[firstButton], listButtonChat[secondButton])
+        bot.send_message(call.message.chat.id, txt, reply_markup=markup_inline)
+        checkStatus[call.message.chat.id][index] = call.data
+
+
+def createButtonChat():
+    for k, v in {'finance': '📊 Сфера финансов', 'it': '🖥 Сфера IT',
+                 'management': '👱🏻‍♂ Менеджмент',
+                 'accounting': '🗃 Бухгалтерия', 'gamedesigners': '🎮 Game Design',
+                 'developers': '💻 Developer',
+                 'crisisAnalytics': 'Кризисная аналитика', 'registration': 'Бухгалтерский учёт',
+                 'state': 'Государственный', 'entrepreneurial': 'Предпринимательский'}.items():
+        listButtonChat[k] = types.InlineKeyboardButton(text=v, callback_data=k)
+
+
+def print_vacancy(chat_id, start_index, end_index):
+    for i in range(start_index, end_index):
+        vacancy = vacancies[chat_id][0][i]
+        salary = vacancy[1].split(' - ')
+        place = f'Ближайшая станция метро: {vacancy[0]}'
+
         message = f'Заработная ставка от {salary[0]} и до {salary[1]} рублей.\n'
         message += f'{place}\n'
         message += f'Ссылка на вакансию: {vacancy[2]}.\n'
-        message += f'-------------'
-    
-			bot.send_message(call.message.chat.id,text=message)
-    elif call.data == "management":
-        path.append(call.data)
-        path.append(False)
-        search_profession(db, path[2], f'Менеджмент', 'Management')
-        vacancies = db.read(path[2])  # Список, как список data в примере красивой печати
-        path = []
-				for vacancy in vacancies:
-        	salary = vacancy[1].split()
-        	if vacancy[0] == 'Удалённая работа':
-            place = 'Работа в удалённой форме.'
-        	else:
-            place = f'Ближайшая станция метро: {vacancy[0]}'
-        	message = f'Заработная ставка от {salary[0]} и до {salary[1]} рублей.\n'
-        	message += f'{place}\n'
-        	message += f'Ссылка на вакансию: {vacancy[2]}.\n'
-        	message += f'-------------'
-    
-				bot.send_message(call.message.chat.id,text=message)
-			
-			
-
-def createButtonChat():
-    massButtonChat['work'] = types.InlineKeyboardButton(text="💰 Работа", callback_data="work")
-    massButtonChat['sideJob'] = types.InlineKeyboardButton(text="🪙 Подработка", callback_data="sideJob")
-
-    massButtonChat['finance'] = types.InlineKeyboardButton(text="📊 Сфера финансов", callback_data="finance")
-    massButtonChat['it'] = types.InlineKeyboardButton(text="🖥 Сфера IT", callback_data="it")
-
-    massButtonChat['management'] = types.InlineKeyboardButton(text="👱🏻‍♂ Менеджмент", callback_data="management")
-    massButtonChat['accounting'] = types.InlineKeyboardButton(text="🗃 Бухгалтерия", callback_data="accounting")
-
-    massButtonChat['gameDesign'] = types.InlineKeyboardButton(text="🎮 Game Design", callback_data="gameDesign")
-    massButtonChat['developer'] = types.InlineKeyboardButton(text="💻 Developer", callback_data="developer")
-
-    massButtonChat['distantWork'] = types.InlineKeyboardButton(text="🏠 Удалённая работа", callback_data='distantWork')
-    massButtonChat['spaceWork'] = types.InlineKeyboardButton(text="🏢 Space work", callback_data='spaceWork')
+        bot.send_message(chat_id, message)
 
 
 def createButtonKeyboard():
-    g = ['Python', 'C++', 'C#', 'Swift', 'Java', 'Assembler']
-    d = ['Python', 'Rust', 'C++', 'C#', 'VS', 'SQL', 'Swift', 'Kotlin', 'Java']
+    languages = {'Python': ['G', 'D'], 'C++': ['G', 'D'], 'C#': ['G', 'D'], 'Swift': ['G', 'D'],
+                 'Java': ['G', 'D'],
+                 'Assembler': ['G'], 'Rust': ['D'], 'JavaScript': ['D'], 'SQL': ['D'],
+                 'Kotlin': ['D']}
 
-    for i in range(len(g)):
-        massButtonKeyboardG.append(types.KeyboardButton(g[i]))
+    for language, fields in languages.items():
+        for field in fields:
+            listKeyboardLanguages[field].append(
+                types.InlineKeyboardButton(text=language, callback_data=language))
 
-    for i in range(len(d)):
-        massButtonKeyboardD.append(types.KeyboardButton(d[i]))
+    for district in nameDistricts:
+        massKeyboardDistrict.append(
+            types.InlineKeyboardButton(text=district, callback_data=district))
 
 
 if __name__ == '__main__':
