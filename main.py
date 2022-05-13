@@ -52,7 +52,7 @@ def start(message):
     checkStatus[message.chat.id] = [None] * 4
     bot.send_message(message.chat.id,
                      "Напишите команду /feedback для того, чтобы сообщить нам о проблемах " \
-                     "и доработках",
+                     "и доработках.",
                      reply_markup=markup_inline)
 
 
@@ -105,6 +105,8 @@ def answer(call):
         table = checkStatus[call.message.chat.id][1]
         specialization = checkStatus[call.message.chat.id][2]
         district = checkStatus[call.message.chat.id][3]
+
+        bot.send_message(call.message.chat.id, 'Подождите немного, происходит поиск вакансий по заданным критериям.')
 
         search_profession(call.message.chat.id, db, table, profession, specialization, district)
         vacancies[call.message.chat.id] = [db.read(call.message.chat.id, table).copy(), 0]
